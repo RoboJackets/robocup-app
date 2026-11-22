@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -26,6 +28,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
@@ -44,7 +47,7 @@ private val Red = Color(0xFFC03939)
 @Composable
 fun DriverStationScreen() {
     var robot by remember { mutableIntStateOf(1) }
-    var running by remember { mutableStateOf(false) }
+    var controlState by remember { mutableIntStateOf(0) } // 0 = stopped, 1 = initialized, 2 = running
     var robotMenu by remember { mutableStateOf(false) }
     val connected = false
 
@@ -78,10 +81,14 @@ fun DriverStationScreen() {
     }
 
     val logs = listOf(
-        "SYSTEM" to "Driver station initialized",
-        "INPUT" to "Waiting for controller input",
+        "SYSTEM" to "Driver station ready",
+        "INPUT" to "Awaiting controller input",
         "ROBOT" to "Robot %02d selected".format(robot),
-        "STATE" to if (running) "Start selected" else "Stop selected",
+        "STATE" to when (controlState) {
+            1 -> "Initialized"
+            2 -> "Running"
+            else -> "Stopped"
+        },
         "WAIT" to "No robot telemetry received"
     )
 
@@ -143,99 +150,108 @@ fun DriverStationScreen() {
             BoxWithConstraints(
                 Modifier.weight(0.36f).fillMaxHeight()
             ) {
-                val buttonSize = minOf(
-                    maxWidth * 0.48f, maxHeight * 0.34f, 105.dp
-                )
-                val gap = minOf(maxHeight * 0.11f, 28.dp)
-                val selectorWidth = minOf(150.dp, maxWidth - 20.dp)
+                val controlSize = minOf(maxWidth * 0.48f, maxHeight * 0.34f, 105.dp)
+                val selectorWidth = minOf(maxWidth - 24.dp, 196.dp)
 
-                Column(
-                    Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Compact selector centered above the play button.
-                    Box(Modifier.width(selectorWidth)) {
-                        Row(
-                            Modifier.fillMaxWidth().height(42.dp)
-                                .clickable { robotMenu = true },
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("ROBOT", color = Gold, fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-                            Spacer(Modifier.width(13.dp))
-                            Text("%02d".format(robot), color = White, fontSize = 25.sp,
-                                fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(9.dp))
-                            Text("▾", color = Gold, fontSize = 19.sp)
-                        }
-                        DropdownMenu(
-                            expanded = robotMenu,
-                            onDismissRequest = { robotMenu = false },
-                            modifier = Modifier.width(selectorWidth)
-                                .background(StationGradient)
-                        ) {
-                            (1..6).forEach { id ->
-                                val selected = id == robot
-                                DropdownMenuItem(
-                                    modifier = Modifier.height(42.dp).background(
-                                        if (selected) Gold.copy(alpha = 0.13f)
-                                        else Color.Transparent
-                                    ),
-                                    text = {
-                                        Box(Modifier.fillMaxWidth(),
-                                            contentAlignment = Alignment.Center) {
-                                            Text("%02d".format(id),
-                                                color = if (selected) Gold else White,
-                                                fontSize = 17.sp,
-                                                fontWeight = if (selected) FontWeight.Bold
-                                                else FontWeight.Medium)
-                                        }
-                                    },
-                                    onClick = { robot = id; robotMenu = false }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(gap))
-
-                    Canvas(
-                        Modifier.size(buttonSize)
-                            .background(
-                                if (running) Brush.verticalGradient(
-                                    listOf(Color(0xFFFFD959), Gold, Color(0xFFE6AA10))
-                                ) else Brush.verticalGradient(
-                                    listOf(Color(0xFF36332A), Color(0xFF232321))
-                                ), CircleShape
-                            )
-                            .border(2.dp, Gold.copy(alpha = if (running) 1f else 0.8f), CircleShape)
-                            .clickable { running = !running }
+                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Full-width gold selector; tap anywhere to choose a robot.
+                    Box(
+                        Modifier.fillMaxWidth().height(56.dp)
+                            .background(Gold)
+                            .clickable { robotMenu = true },
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (running) {
-                            val side = size.minDimension * 0.29f
-                            drawRoundRect(Color(0xFF242424), Offset((size.width - side) / 2,
-                                (size.height - side) / 2), Size(side, side),
-                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-                        } else {
-                            val triangle = Path().apply {
-                                moveTo(size.width * 0.39f, size.height * 0.30f)
-                                lineTo(size.width * 0.69f, size.height * 0.50f)
-                                lineTo(size.width * 0.39f, size.height * 0.70f)
-                                close()
+                        // The popup stays anchored to the centered label.
+                        Box(Modifier.width(selectorWidth).fillMaxHeight()) {
+                            Column(
+                                Modifier.align(Alignment.Center),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text("SELECT ROBOT", color = Color(0xFF4A3A18),
+                                    fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                                    letterSpacing = 0.7.sp, lineHeight = 14.sp)
+                                Text("ROBOT %02d".format(robot), color = Color(0xFF171717),
+                                    fontSize = 19.sp, fontWeight = FontWeight.Bold,
+                                    lineHeight = 23.sp)
                             }
-                            drawPath(triangle, Gold)
+                            Text("▼", color = Color(0xFF29251C), fontSize = 16.sp,
+                                modifier = Modifier.align(Alignment.CenterStart))
+                            Text("▼", color = Color(0xFF29251C), fontSize = 16.sp,
+                                modifier = Modifier.align(Alignment.CenterEnd))
+
+                            DropdownMenu(
+                                expanded = robotMenu,
+                                onDismissRequest = { robotMenu = false },
+                                modifier = Modifier.width(selectorWidth).background(Gold)
+                            ) {
+                                (1..6).forEach { id ->
+                                    val selected = id == robot
+                                    DropdownMenuItem(
+                                        modifier = Modifier.height(42.dp).background(
+                                            if (selected) Color(0xFF302B20) else Gold
+                                        ),
+                                        text = {
+                                            Box(Modifier.fillMaxWidth(),
+                                                contentAlignment = Alignment.Center) {
+                                                Text("ROBOT %02d".format(id),
+                                                    color = if (selected) Gold else Color(0xFF171717), fontSize = 16.sp,
+                                                    fontWeight = if (selected) FontWeight.ExtraBold
+                                                    else FontWeight.Medium)
+                                            }
+                                        },
+                                        onClick = { robot = id; robotMenu = false }
+                                    )
+                                }
+                            }
                         }
                     }
-
-                    Spacer(Modifier.height(9.dp))
-
-                    Text(
-                        if (running) "● ON" else "○ OFF",
-                        color = if (running) Gold else Gray,
-                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold
-                    )
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        // One borderless button cycles INIT → PLAY → STOP.
+                        val buttonFill = when (controlState) {
+                            0 -> Color(0xFF363A3C)  // INIT: neutral charcoal
+                            1 -> Color(0xFF363A3C) // PLAY: same charcoal as INIT
+                            else -> Gold             // STOP: RoboJackets gold
+                        }
+                        Box(
+                            Modifier.size(controlSize)
+                                .background(buttonFill, CircleShape)
+                                .clickable { controlState = (controlState + 1) % 3 },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when (controlState) {
+                                0 -> Text(
+                                    "INIT", color = Gold, fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 1.5.sp
+                                )
+                                1 -> Canvas(Modifier.fillMaxSize()) {
+                                    val triangle = Path().apply {
+                                        moveTo(size.width * 0.39f, size.height * 0.29f)
+                                        lineTo(size.width * 0.74f, size.height * 0.47f)
+                                        quadraticBezierTo(size.width * 0.79f, size.height * 0.50f,
+                                            size.width * 0.74f, size.height * 0.53f)
+                                        lineTo(size.width * 0.39f, size.height * 0.71f)
+                                        quadraticBezierTo(size.width * 0.35f, size.height * 0.73f,
+                                            size.width * 0.35f, size.height * 0.68f)
+                                        lineTo(size.width * 0.35f, size.height * 0.32f)
+                                        close()
+                                    }
+                                    drawPath(triangle, Gold)
+                                }
+                                else -> Canvas(Modifier.fillMaxSize()) {
+                                    val side = size.minDimension * 0.32f
+                                    drawRoundRect(
+                                        color = Color(0xFF242424),
+                                        topLeft = Offset((size.width - side) / 2,
+                                            (size.height - side) / 2),
+                                        size = Size(side, side),
+                                        cornerRadius = CornerRadius(5.dp.toPx())
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -247,7 +263,7 @@ fun DriverStationScreen() {
             Column(Modifier.weight(0.64f).fillMaxHeight()) {
                 // Compact horizontal readings leave more room for telemetry.
                 Row(
-                    Modifier.fillMaxWidth().height(48.dp)
+                    Modifier.fillMaxWidth().height(56.dp)
                         .background(Color.White.copy(alpha = 0.045f)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -293,8 +309,6 @@ fun DriverStationScreen() {
                     Spacer(Modifier.width(7.dp))
                     Text("TELEMETRY", color = White, fontSize = 12.sp,
                         fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.weight(1f))
-                    Text("DEBUG", color = Gray, fontSize = 9.sp)
                 }
 
                 LazyColumn(
@@ -312,7 +326,7 @@ fun DriverStationScreen() {
                                     "SYSTEM" -> Gold
                                     "INPUT" -> Color(0xFF71C7E8)
                                     "ROBOT" -> Color(0xFFC4A1EF)
-                                    "STATE" -> if (running) Color(0xFF70D69A) else Gold
+                                    "STATE" -> if (controlState == 2) Color(0xFF70D69A) else Gold
                                     "WAIT" -> Color(0xFFFFB866)
                                     else -> Gray
                                 },
@@ -377,3 +391,4 @@ private fun StatIcon(battery: Boolean) {
         }
     }
 }
+

@@ -1,0 +1,8 @@
+com.example.robocupcontrollertest.app-pngs-0 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\build\generated\res\pngs\debug
+com.example.robocupcontrollertest.app-updated_navigation_xml-1 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\build\generated\updated_navigation_xml\debug
+com.example.robocupcontrollertest.app-packageDebugResources-2 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\build\intermediates\incremental\debug\packageDebugResources\merged.dir
+com.example.robocupcontrollertest.app-packageDebugResources-3 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\build\intermediates\incremental\debug\packageDebugResources\stripped.dir
+com.example.robocupcontrollertest.app-debug-4 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\build\intermediates\merged_res\debug\mergeDebugResources
+com.example.robocupcontrollertest.app-debug-5 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\src\debug\res
+com.example.robocupcontrollertest.app-main-6 C:\Users\sunma\AndroidStudioProjects\RoboCupControllerTest\app\src\main\res
+gradleHome-0 C:\Users\sunma\.gradle

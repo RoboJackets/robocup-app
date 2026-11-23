@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity(), InputManager.InputDeviceListener {
 
             executor.execute {
                 try {
-                    udpSender.sendMovement(movement, "10.90.84.241", 5005)
+                    udpSender.sendMovement(movement, "Put your ip address", 5005)
                 } catch (e: Exception) {
                     Log.e("xbox", "UDP send failed", e)
                 }
